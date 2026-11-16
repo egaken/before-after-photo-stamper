@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
+  <title>施工前・施工後 かんたん文字入れアプリ</title>
+  <!-- Google Fonts: Noto Sans JP (極太900 / 太字700) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@500;700;900&display=swap" rel="stylesheet">
+  <!-- 外部ライブラリ: HEIC変換 (heic2any) & ZIP一括保存 (JSZip) -->
+  <script src="https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js" defer></script>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- ヘッダー -->
+  <header class="app-header">
+    <div class="header-inner">
+      <div class="logo-area">
+        <span class="logo-badge">Before / After</span>
+        <h1>施工前・施工後 文字入れアプリ</h1>
+      </div>
+      <p class="header-desc">毎回同じフォント・見切れない右下位置に「白文字＋黒縁取り」を自動で入れます（iPhoneのHEIC写真も対応）</p>
+    </div>
+  </header>
+
+  <main class="container">
+    <!-- ステップ進行ガイドバー -->
+    <section class="guide-banner" id="guideBanner">
+      <div class="guide-steps">
+        <div class="guide-step active" id="stepIndicator1">
+          <span class="step-num">1</span>
+          <span class="step-text"><strong>施工前</strong>の写真をアップ</span>
+        </div>
+        <div class="guide-arrow">→</div>
+        <div class="guide-step" id="stepIndicator2">
+          <span class="step-num">2</span>
+          <span class="step-text"><strong>施工後</strong>の写真をアップ</span>
+        </div>
+        <div class="guide-arrow">→</div>
+        <div class="guide-step" id="stepIndicator3">
+          <span class="step-num">3</span>
+          <span class="step-text"><strong>保存・2枚合体</strong></span>
+        </div>
+      </div>
+      <p class="guide-message" id="guideMessage">
+        まずは下の<strong>「① 施工前の写真を追加」</strong>から写真をアップしてください（1枚だけでも、3〜4枚まとめてでもOKです！）
+      </p>
+    </section>
+
+    <!-- 設定パネル（投稿先・切り抜き・文字設定） -->
+    <section class="settings-card">
+      <div class="settings-header">
+        <h2>⚙️ 投稿先と文字の設定（あとからでも切り替えられます）</h2>
+      </div>
+
+      <div class="settings-grid">
+        <!-- 1. 投稿先プリセット -->
+        <div class="setting-group">
+          <label class="setting-label">
+            <span class="label-badge">設定 A</span> 投稿先を選ぶ（端が切れない位置に自動調整）
+          </label>
+          <div class="preset-buttons" id="platformPresets">
+            <button type="button" class="preset-btn active" data-platform="ig_post_portrait">
+              <span class="preset-icon">📸</span>
+              <span class="preset-title">インスタ投稿（縦長）</span>
+              <span class="preset-sub">4:5 / 右下5%余白</span>
+            </button>
+            <button type="button" class="preset-btn" data-platform="ig_post_square">
+              <span class="preset-icon">🟦</span>
+              <span class="preset-title">インスタ投稿（正方形）</span>
+              <span class="preset-sub">1:1 / 右下5%余白</span>
+            </button>
+            <button type="button" class="preset-btn" data-platform="ig_story">
+              <span class="preset-icon">📱</span>
+              <span class="preset-title">ストーリーズ</span>
+              <span class="preset-sub">9:16 / 下ボタン回避</span>
+            </button>
+            <button type="button" class="preset-btn" data-platform="google_business">
+              <span class="preset-icon">🏢</span>
+              <span class="preset-title">Googleビジネス</span>
+              <span class="preset-sub">4:3 / 安全内側8%</span>
+            </button>
+          </div>
+          <p class="setting-hint" id="platformHint">
+            💡 インスタ投稿（縦長4:5）：一覧でも見切れず、スマホ画面で一番大きく見やすい標準設定です。
+          </p>
+        </div>
+
+        <!-- 2. 写真の切り抜き（トリミング）設定 -->
+        <div class="setting-group">
+          <label class="setting-label">
+            <span class="label-badge">設定 B</span> 写真の形（切り抜き）
+          </label>
+          <div class="toggle-buttons" id="cropModeButtons">
+            <button type="button" class="toggle-btn active" data-crop="original">
+              <strong>元の写真の形のまま</strong>
+              <span>切り抜かずに文字位置だけ安全にする</span>
+            </button>
+            <button type="button" class="toggle-btn" data-crop="preset">
+              <strong>投稿先の比率に自動で切り抜く</strong>
+              <span>選んだ投稿先の形（4:5 / 1:1 / 9:16 / 4:3）に揃える</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- 3. 文字の表記とサイズ -->
+        <div class="setting-group setting-row-split">
+          <div class="sub-group">
+            <label class="setting-label">
+              <span class="label-badge">設定 C</span> 入れる文字の表記
+            </label>
+            <div class="pill-buttons" id="wordingButtons">
+              <button type="button" class="pill-btn active" data-wording="sekou">施工前 / 施工後</button>
+              <button type="button" class="pill-btn" data-wording="shikou">施行前 / 施行後</button>
+              <button type="button" class="pill-btn" data-wording="english">Before / After</button>
+              <button type="button" class="pill-btn" data-wording="custom">自由入力</button>
+            </div>
+            <!-- 自由入力欄（カスタム選択時のみ表示） -->
+            <div class="custom-text-inputs hidden" id="customTextInputs">
+              <div class="input-pair">
+                <label>前の文字：<input type="text" id="customBeforeText" value="施工前" maxlength="15"></label>
+                <label>後の文字：<input type="text" id="customAfterText" value="施工後" maxlength="15"></label>
+              </div>
+            </div>
+          </div>
+
+          <div class="sub-group">
+            <label class="setting-label">
+              <span class="label-badge">設定 D</span> 文字の大きさ・縁取り
+            </label>
+            <div class="pill-buttons" id="textSizeButtons">
+              <button type="button" class="pill-btn" data-size="0.055">小さめ</button>
+              <button type="button" class="pill-btn active" data-size="0.072">標準（おすすめ）</button>
+              <button type="button" class="pill-btn" data-size="0.092">大きめ</button>
+              <button type="button" class="pill-btn" data-size="0.115">特大</button>
+            </div>
+            <div class="extra-checks">
+              <label class="checkbox-label">
+                <input type="checkbox" id="showSafeZoneGuide">
+                <span>プレビューに見切れ防止ライン（ガイド枠）を表示する</span>
+              </label>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- アップロードエリア（①施工前 / ②施工後） -->
+    <section class="upload-section">
+      <div class="upload-grid">
+        <!-- ① 施工前 アップロード枠 -->
+        <div class="upload-box before-box" id="beforeDropZone">
+          <div class="upload-box-header">
+            <span class="step-badge before-badge">ステップ ①</span>
+            <h3>まずは【<span class="js-before-label">施工前</span>】の写真をアップ</h3>
+          </div>
+          <p class="upload-box-desc">1枚だけでも、3〜4枚まとめて選んでもOK！<br>すべて自動で右下に「<span class="js-before-label">施工前</span>」が入ります。</p>
+          <label class="upload-btn before-btn" for="beforeFileInput">
+            <span class="btn-icon">📁</span>
+            <span class="btn-text">【<span class="js-before-label">施工前</span>】の写真を選ぶ（複数OK）</span>
+          </label>
+          <input type="file" id="beforeFileInput" accept="image/*,.heic,.heif" multiple hidden>
+          <p class="upload-sub-note">パソコンの方はここに写真をドラッグ＆ドロップもできます（HEIC / JPG / PNG対応）</p>
+          <div class="upload-count-status" id="beforeCountStatus">現在 0 枚</div>
+        </div>
+
+        <!-- ② 施工後 アップロード枠 -->
+        <div class="upload-box after-box" id="afterDropZone">
+          <div class="upload-box-header">
+            <span class="step-badge after-badge">ステップ ②</span>
+            <h3>次に【<span class="js-after-label">施工後</span>】の写真をアップ</h3>
+          </div>
+          <p class="upload-box-desc">こちらも1枚〜複数枚まとめて選択OK！<br>すべて自動で右下に「<span class="js-after-label">施工後</span>」が入ります。</p>
+          <label class="upload-btn after-btn" for="afterFileInput">
+            <span class="btn-icon">✨</span>
+            <span class="btn-text">【<span class="js-after-label">施工後</span>】の写真を選ぶ（複数OK）</span>
+          </label>
+          <input type="file" id="afterFileInput" accept="image/*,.heic,.heif" multiple hidden>
+          <p class="upload-sub-note">パソコンの方はここに写真をドラッグ＆ドロップもできます（HEIC / JPG / PNG対応）</p>
+          <div class="upload-count-status" id="afterCountStatus">現在 0 枚</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 変換中ローディング表示 -->
+    <div class="loading-overlay hidden" id="loadingOverlay">
+      <div class="loading-card">
+        <div class="spinner"></div>
+        <p class="loading-title" id="loadingText">写真を読み込んで文字を入れています...</p>
+        <p class="loading-sub">iPhoneのHEIC写真は自動で高画質JPEGに変換されます</p>
+      </div>
+    </div>
+
+    <!-- モード切り替えタブ（1枚ずつ文字入れ一覧 ／ 2枚を1枚に合体） -->
+    <section class="workspace-section hidden" id="workspaceSection">
+      <div class="mode-tabs">
+        <button type="button" class="mode-tab active" data-tab="individualTab" id="tabBtnIndividual">
+          🖼️ 文字入れ済みの写真一覧（<span id="totalPhotoCount">0</span>枚）
+        </button>
+        <button type="button" class="mode-tab" data-tab="combineTab" id="tabBtnCombine">
+          🆚 2枚を1枚に合体（左右・上下の比較画像）
+        </button>
+      </div>
+
+      <!-- タブ1：1枚ずつの文字入れ結果＆一括保存 -->
+      <div class="tab-content active" id="individualTab">
+        <!-- 一括操作バー -->
+        <div class="bulk-action-bar">
+          <div class="bulk-info">
+            <strong>✅ 文字入れ完了！</strong> 写真ごとに保存するか、まとめて一括保存できます。
+          </div>
+          <div class="bulk-buttons">
+            <button type="button" class="action-btn primary-btn" id="shareAllBtn">
+              📱 スマホにまとめて保存 / 共有
+            </button>
+            <button type="button" class="action-btn secondary-btn" id="downloadAllSeqBtn">
+              💾 1枚ずつ順番にすべて保存
+            </button>
+            <button type="button" class="action-btn outline-btn" id="downloadZipBtn">
+              📦 ZIPでまとめて保存（PC向け）
+            </button>
+            <button type="button" class="action-btn danger-outline-btn" id="clearAllBtn">
+              🗑️ すべてクリア
+            </button>
+          </div>
+        </div>
+
+        <!-- 施工前・施工後の結果グループ -->
+        <div class="results-container">
+          <!-- 施工前グループ -->
+          <div class="result-group" id="beforeResultGroup">
+            <div class="result-group-header before-header">
+              <h4>① 【<span class="js-before-label">施工前</span>】の写真（<span id="beforeGroupCount">0</span>枚）</h4>
+              <button type="button" class="small-add-btn" id="addMoreBeforeBtn">＋ 写真を追加</button>
+            </div>
+            <div class="photo-grid" id="beforePhotoGrid"></div>
+          </div>
+
+          <!-- 施工後グループ -->
+          <div class="result-group" id="afterResultGroup">
+            <div class="result-group-header after-header">
+              <h4>② 【<span class="js-after-label">施工後</span>】の写真（<span id="afterGroupCount">0</span>枚）</h4>
+              <button type="button" class="small-add-btn" id="addMoreAfterBtn">＋ 写真を追加</button>
+            </div>
+            <div class="photo-grid" id="afterPhotoGrid"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- タブ2：2枚を1枚に合体（比較画像作成） -->
+      <div class="tab-content" id="combineTab">
+        <div class="combine-panel">
+          <div class="combine-header">
+            <h3>🆚 【<span class="js-before-label">施工前</span>】と【<span class="js-after-label">施工後</span>】を1枚の画像に合体</h3>
+            <p>1枚ずつアップした場合は自動で選ばれています。3〜4枚ある場合は、合体させたい写真を下からタップして選んでください。</p>
+          </div>
+
+          <!-- 合体レイアウト設定 -->
+          <div class="combine-controls">
+            <div class="combine-control-group">
+              <label>並べ方：</label>
+              <div class="pill-buttons" id="combineDirectionButtons">
+                <button type="button" class="pill-btn active" data-dir="horizontal">⬅️➡️ 左右に並べる（左：前 / 右：後）</button>
+                <button type="button" class="pill-btn" data-dir="vertical">⬆️⬇️ 上下に並べる（上：前 / 下：後）</button>
+              </div>
+            </div>
+
+            <div class="combine-control-group">
+              <label>全体の形：</label>
+              <div class="pill-buttons" id="combineFrameButtons">
+                <button type="button" class="pill-btn active" data-frame="preset">投稿先の比率に合わせる（<span id="currentPresetRatioLabel">4:5</span>）</button>
+                <button type="button" class="pill-btn" data-frame="natural">2枚をそのまま連結する</button>
+              </div>
+            </div>
+
+            <div class="combine-control-group">
+              <label>境界線：</label>
+              <div class="pill-buttons" id="combineBorderButtons">
+                <button type="button" class="pill-btn active" data-border="white">白ライン</button>
+                <button type="button" class="pill-btn" data-border="black">黒ライン</button>
+                <button type="button" class="pill-btn" data-border="none">線なし</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- 合体させる写真の選択（複数枚あるときもワンタップで選べる） -->
+          <div class="combine-selector-grid">
+            <div class="selector-box before-selector-box">
+              <h5>① 合体する【<span class="js-before-label">施工前</span>】を選ぶ</h5>
+              <div class="selector-thumbs" id="combineBeforeThumbs"></div>
+            </div>
+            <div class="selector-box after-selector-box">
+              <h5>② 合体する【<span class="js-after-label">施工後</span>】を選ぶ</h5>
+              <div class="selector-thumbs" id="combineAfterThumbs"></div>
+            </div>
+          </div>
+
+          <!-- 合体プレビュー＆保存ボタン -->
+          <div class="combine-preview-area" id="combinePreviewArea">
+            <div class="combine-canvas-wrapper">
+              <canvas id="combineCanvas"></canvas>
+              <p class="combine-empty-msg hidden" id="combineEmptyMsg">
+                「施工前」と「施工後」の写真をそれぞれ1枚以上アップすると、ここに合体画像が自動で作られます。
+              </p>
+            </div>
+
+            <div class="combine-FineTune" id="combineFineTune">
+              <div class="fine-tune-item">
+                <label>【<span class="js-before-label">施工前</span>】の写真位置調整：</label>
+                <input type="range" id="combineBeforeOffset" min="-50" max="50" value="0">
+                <button type="button" class="mini-reset-btn" id="resetBeforeOffset">中央に戻す</button>
+              </div>
+              <div class="fine-tune-item">
+                <label>【<span class="js-after-label">施工後</span>】の写真位置調整：</label>
+                <input type="range" id="combineAfterOffset" min="-50" max="50" value="0">
+                <button type="button" class="mini-reset-btn" id="resetAfterOffset">中央に戻す</button>
+              </div>
+            </div>
+
+            <div class="combine-actions">
+              <button type="button" class="action-btn primary-btn large-btn" id="downloadCombinedBtn">
+                💾 合体した比較画像を保存する
+              </button>
+              <button type="button" class="action-btn secondary-btn large-btn" id="shareCombinedBtn">
+                📱 スマホの写真フォルダに保存 / 共有
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- 拡大プレビュー用モーダル -->
+  <div class="modal-backdrop hidden" id="previewModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 id="modalTitle">仕上がりプレビュー</h3>
+        <button type="button" class="modal-close-btn" id="closeModalBtn">✕ 閉じる</button>
+      </div>
+      <div class="modal-body">
+        <img id="modalImage" src="" alt="拡大プレビュー">
+      </div>
+      <div class="modal-footer">
+        <p class="modal-tip">💡 スマホの場合は上の画像を長押しして「写真に保存」することもできます。</p>
+        <button type="button" class="action-btn primary-btn" id="modalDownloadBtn">💾 この画像を保存する</button>
+      </div>
+    </div>
+  </div>
+
+  <footer class="app-footer">
+    <p>施工前・施工後 文字入れアプリ — すべての画像処理はお使いの端末内で安全に行われます</p>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
