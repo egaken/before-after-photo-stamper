@@ -1155,8 +1155,25 @@ body {
   margin-top: 32px;
 }
 
-/* スマホ対応レスポンシブ */
+/* スマホ対応レスポンシブ（PC表示には影響しません） */
 @media (max-width: 768px) {
+  .app-header {
+    padding: 14px 12px;
+  }
+  .app-header h1 {
+    font-size: 1.2rem;
+  }
+  .container {
+    margin: 12px auto;
+    padding: 0 12px;
+    gap: 14px;
+  }
+  .guide-banner,
+  .settings-card,
+  .upload-box,
+  .tab-content {
+    padding: 14px;
+  }
   .preset-buttons {
     grid-template-columns: repeat(2, 1fr);
   }
@@ -1166,9 +1183,19 @@ body {
   .combine-selector-grid {
     grid-template-columns: 1fr;
   }
+  /* iOS Safariの入力時自動ズーム防止（16px以上） */
+  .input-pair input {
+    font-size: 16px;
+    flex: 1;
+    width: auto;
+  }
+  /* スマホではドラッグ＆ドロップ注記を控えめに表示 */
+  .upload-sub-note {
+    font-size: 0.74rem;
+  }
   .mode-tab {
-    font-size: 0.88rem;
-    padding: 12px 8px;
+    font-size: 0.85rem;
+    padding: 12px 6px;
   }
   .bulk-action-bar {
     flex-direction: column;
@@ -1176,5 +1203,44 @@ body {
   }
   .bulk-buttons {
     flex-direction: column;
+  }
+  /* 2枚合体パネルのスマホ操作性向上 */
+  .combine-control-group {
+    flex-direction: column;
+    align-items: stretch;
+    width: 100%;
+  }
+  .combine-control-group .pill-buttons {
+    display: flex;
+    flex-direction: column;
+  }
+  .combine-control-group .pill-btn {
+    width: 100%;
+    text-align: center;
+  }
+  .fine-tune-item {
+    flex-wrap: wrap;
+    width: 100%;
+    justify-content: space-between;
+  }
+  .fine-tune-item input[type="range"] {
+    width: 100%;
+    order: 3;
+    margin-top: 4px;
+    height: 28px;
+  }
+  .combine-actions {
+    flex-direction: column-reverse;
+    width: 100%;
+  }
+  .combine-actions .action-btn {
+    width: 100%;
+  }
+  .modal-footer {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .modal-footer .action-btn {
+    width: 100%;
   }
 }
