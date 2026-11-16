@@ -1,4 +1,4 @@
-// 施工前・施工後 かんたん文字入れアプリ (app.js)
+// 施工前・施工後 文字入れくん (app.js)
 
 const PLATFORM_CONFIGS = {
   ig_post_portrait: {
