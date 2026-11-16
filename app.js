@@ -45,7 +45,6 @@ const PLATFORM_CONFIGS = {
 
 const WORDING_PRESETS = {
   sekou: { before: '施工前', after: '施工後' },
-  shikou: { before: '施行前', after: '施行後' },
   english: { before: 'Before', after: 'After' }
 };
 
@@ -53,7 +52,7 @@ const WORDING_PRESETS = {
 const state = {
   platform: 'ig_post_portrait',
   cropMode: 'original', // 'original' | 'preset'
-  wordingMode: 'sekou', // 'sekou' | 'shikou' | 'english' | 'custom'
+  wordingMode: 'sekou', // 'sekou' | 'english' | 'custom'
   customBefore: '施工前',
   customAfter: '施工後',
   textSizeRatio: 0.072,
