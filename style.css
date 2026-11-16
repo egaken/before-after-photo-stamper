@@ -779,24 +779,51 @@ body {
   align-items: center;
   justify-content: center;
   overflow: hidden;
-  cursor: zoom-in;
+  cursor: grab;
+  user-select: none;
+  touch-action: none;
+}
+
+.photo-preview-wrap.is-dragging {
+  cursor: grabbing;
 }
 
 .photo-preview-wrap img {
   max-width: 100%;
   max-height: 100%;
   object-fit: contain;
+  pointer-events: none;
 }
 
 .zoom-badge {
   position: absolute;
   top: 8px;
   left: 8px;
-  background: rgba(15, 23, 42, 0.75);
+  background: rgba(15, 23, 42, 0.8);
   color: #ffffff;
+  font-family: inherit;
+  font-weight: 700;
   font-size: 0.72rem;
-  padding: 3px 8px;
+  padding: 4px 9px;
   border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  cursor: pointer;
+  z-index: 2;
+}
+
+.zoom-badge:hover {
+  background: rgba(37, 99, 235, 0.9);
+}
+
+.drag-hint-badge {
+  position: absolute;
+  bottom: 8px;
+  left: 8px;
+  background: rgba(15, 23, 42, 0.68);
+  color: #e2e8f0;
+  font-size: 0.68rem;
+  padding: 2px 7px;
+  border-radius: 5px;
   pointer-events: none;
 }
 
@@ -841,20 +868,78 @@ body {
   max-width: 150px;
 }
 
-/* 切り抜き時の位置調整スライダー */
-.crop-offset-control {
+/* 拡大・位置合わせ（構図調整）パネル */
+.crop-adjust-box {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  padding: 8px 10px;
+  border-radius: 8px;
+}
+
+.crop-adjust-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 2px;
+}
+
+.crop-adjust-title {
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: #334155;
+}
+
+.crop-reset-btn {
+  padding: 2px 8px;
+  font-size: 0.72rem;
+  font-family: inherit;
+  font-weight: 700;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #334155;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.crop-reset-btn:hover:not(:disabled) {
+  background: #f1f5f9;
+}
+
+.crop-reset-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.crop-slider-row {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 0.78rem;
+  font-size: 0.76rem;
   color: var(--text-sub);
-  background: #f1f5f9;
-  padding: 6px 8px;
-  border-radius: 6px;
 }
 
-.crop-offset-control input[type="range"] {
+.crop-slider-label {
+  width: 48px;
+  flex-shrink: 0;
+  font-weight: 700;
+  color: #475569;
+}
+
+.crop-slider-row input[type="range"] {
   flex: 1;
+  cursor: pointer;
+}
+
+.crop-slider-val {
+  width: 38px;
+  text-align: right;
+  font-weight: 700;
+  font-size: 0.75rem;
+  color: var(--primary);
+  flex-shrink: 0;
 }
 
 .photo-card-actions {
@@ -1032,6 +1117,12 @@ body {
   height: auto;
   border-radius: 4px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+  cursor: grab;
+  touch-action: none;
+}
+
+#combineCanvas:active {
+  cursor: grabbing;
 }
 
 .combine-empty-msg {
@@ -1042,30 +1133,75 @@ body {
 }
 
 .combine-FineTune {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 16px;
-  justify-content: center;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
   width: 100%;
-  max-width: 640px;
+  max-width: 680px;
 }
 
-.fine-tune-item {
+.fine-tune-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: #ffffff;
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 2px solid var(--border-color);
+  font-size: 0.82rem;
+}
+
+.before-fine-tune {
+  border-color: var(--before-border);
+  background: #f8fdff;
+}
+
+.after-fine-tune {
+  border-color: var(--after-border);
+  background: #f6fef9;
+}
+
+.fine-tune-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 2px;
+}
+
+.fine-tune-row {
   display: flex;
   align-items: center;
   gap: 8px;
-  background: #ffffff;
-  padding: 8px 12px;
-  border-radius: 8px;
-  border: 1px solid var(--border-color);
-  font-size: 0.84rem;
+}
+
+.fine-tune-label {
+  width: 54px;
+  flex-shrink: 0;
+  font-weight: 700;
+  color: #334155;
+}
+
+.fine-tune-row input[type="range"] {
+  flex: 1;
+  cursor: pointer;
+}
+
+.fine-tune-val {
+  width: 40px;
+  text-align: right;
+  font-weight: 700;
+  color: var(--primary);
+  flex-shrink: 0;
 }
 
 .mini-reset-btn {
-  padding: 4px 8px;
-  font-size: 0.75rem;
+  padding: 3px 8px;
+  font-size: 0.74rem;
+  font-family: inherit;
+  font-weight: 700;
   border: 1px solid #cbd5e1;
-  background: #f8fafc;
+  background: #ffffff;
   border-radius: 4px;
   cursor: pointer;
 }
@@ -1180,7 +1316,8 @@ body {
   .toggle-buttons,
   .setting-row-split,
   .upload-grid,
-  .combine-selector-grid {
+  .combine-selector-grid,
+  .combine-FineTune {
     grid-template-columns: 1fr;
   }
   /* iOS Safariの入力時自動ズーム防止（16px以上） */

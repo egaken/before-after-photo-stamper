@@ -57,15 +57,13 @@ const state = {
   customAfter: '施工後',
   textSizeRatio: 0.072,
   showSafeZoneGuide: false,
-  photos: [], // { id, type: 'before'|'after', originalName, img, cropOffset: 0, previewDataUrl }
+  photos: [], // { id, type: 'before'|'after', originalName, img, zoom: 1, panX: 0, panY: 0, previewDataUrl }
   combine: {
     direction: 'horizontal', // 'horizontal' | 'vertical'
     frame: 'preset', // 'preset' | 'natural'
     border: 'white', // 'white' | 'black' | 'none'
     selectedBeforeId: null,
-    selectedAfterId: null,
-    beforeOffset: 0,
-    afterOffset: 0
+    selectedAfterId: null
   },
   modalPhotoId: null
 };
@@ -127,8 +125,14 @@ const els = {
   combineCanvas: document.getElementById('combineCanvas'),
   combineEmptyMsg: document.getElementById('combineEmptyMsg'),
   combineFineTune: document.getElementById('combineFineTune'),
-  combineBeforeOffset: document.getElementById('combineBeforeOffset'),
-  combineAfterOffset: document.getElementById('combineAfterOffset'),
+  combineBeforeZoom: document.getElementById('combineBeforeZoom'),
+  combineBeforeZoomVal: document.getElementById('combineBeforeZoomVal'),
+  combineBeforePanX: document.getElementById('combineBeforePanX'),
+  combineBeforePanY: document.getElementById('combineBeforePanY'),
+  combineAfterZoom: document.getElementById('combineAfterZoom'),
+  combineAfterZoomVal: document.getElementById('combineAfterZoomVal'),
+  combineAfterPanX: document.getElementById('combineAfterPanX'),
+  combineAfterPanY: document.getElementById('combineAfterPanY'),
   resetBeforeOffset: document.getElementById('resetBeforeOffset'),
   resetAfterOffset: document.getElementById('resetAfterOffset'),
   downloadCombinedBtn: document.getElementById('downloadCombinedBtn'),
@@ -330,27 +334,81 @@ function bindEvents() {
     renderCombinedCanvas();
   });
 
-  els.combineBeforeOffset.addEventListener('input', (e) => {
-    state.combine.beforeOffset = parseInt(e.target.value, 10) || 0;
-    renderCombinedCanvas();
-  });
+  // 合体タブでの構図微調整（施工前・施工後）
+  const bindCombinePhotoAdjust = (which) => {
+    const isBefore = which === 'before';
+    const zoomInput = isBefore ? els.combineBeforeZoom : els.combineAfterZoom;
+    const zoomValEl = isBefore ? els.combineBeforeZoomVal : els.combineAfterZoomVal;
+    const panXInput = isBefore ? els.combineBeforePanX : els.combineAfterPanX;
+    const panYInput = isBefore ? els.combineBeforePanY : els.combineAfterPanY;
+    const resetBtn = isBefore ? els.resetBeforeOffset : els.resetAfterOffset;
 
-  els.combineAfterOffset.addEventListener('input', (e) => {
-    state.combine.afterOffset = parseInt(e.target.value, 10) || 0;
-    renderCombinedCanvas();
-  });
+    const getTargetPhoto = () => {
+      const targetId = isBefore ? state.combine.selectedBeforeId : state.combine.selectedAfterId;
+      return state.photos.find(p => p.id === targetId) || null;
+    };
 
-  els.resetBeforeOffset.addEventListener('click', () => {
-    state.combine.beforeOffset = 0;
-    els.combineBeforeOffset.value = 0;
-    renderCombinedCanvas();
-  });
+    const syncBackToCardAndThumb = (photo) => {
+      if (!photo) return;
+      const canvas = renderSinglePhotoToCanvas(photo, false);
+      photo.previewDataUrl = canvas.toDataURL('image/jpeg', 0.88);
+      renderPhotoGroup(photo.type, photo.type === 'before' ? els.beforePhotoGrid : els.afterPhotoGrid);
+      renderCombineThumbnails();
+    };
 
-  els.resetAfterOffset.addEventListener('click', () => {
-    state.combine.afterOffset = 0;
-    els.combineAfterOffset.value = 0;
-    renderCombinedCanvas();
-  });
+    zoomInput.addEventListener('input', (e) => {
+      const photo = getTargetPhoto();
+      if (!photo) return;
+      const zoomPct = parseInt(e.target.value, 10) || 100;
+      photo.zoom = Math.max(1, Math.min(3, zoomPct / 100));
+      zoomValEl.textContent = `${zoomPct}%`;
+      renderCombinedCanvas(false);
+    });
+    zoomInput.addEventListener('change', () => syncBackToCardAndThumb(getTargetPhoto()));
+
+    panXInput.addEventListener('input', (e) => {
+      const photo = getTargetPhoto();
+      if (!photo) return;
+      const val = parseInt(e.target.value, 10) || 0;
+      if (val !== 0 && (photo.zoom || 1) <= 1.01) {
+        photo.zoom = 1.2;
+        zoomInput.value = 120;
+        zoomValEl.textContent = '120%';
+      }
+      photo.panX = val;
+      renderCombinedCanvas(false);
+    });
+    panXInput.addEventListener('change', () => syncBackToCardAndThumb(getTargetPhoto()));
+
+    panYInput.addEventListener('input', (e) => {
+      const photo = getTargetPhoto();
+      if (!photo) return;
+      const val = parseInt(e.target.value, 10) || 0;
+      if (val !== 0 && (photo.zoom || 1) <= 1.01) {
+        photo.zoom = 1.2;
+        zoomInput.value = 120;
+        zoomValEl.textContent = '120%';
+      }
+      photo.panY = val;
+      renderCombinedCanvas(false);
+    });
+    panYInput.addEventListener('change', () => syncBackToCardAndThumb(getTargetPhoto()));
+
+    resetBtn.addEventListener('click', () => {
+      const photo = getTargetPhoto();
+      if (!photo) return;
+      photo.zoom = 1;
+      photo.panX = 0;
+      photo.panY = 0;
+      syncCombineFineTuneUI();
+      renderCombinedCanvas(false);
+      syncBackToCardAndThumb(photo);
+    });
+  };
+
+  bindCombinePhotoAdjust('before');
+  bindCombinePhotoAdjust('after');
+  setupCombineCanvasDrag();
 
   els.downloadCombinedBtn.addEventListener('click', downloadCombinedImage);
   els.shareCombinedBtn.addEventListener('click', shareCombinedImage);
@@ -480,7 +538,9 @@ async function handleFilesUpload(files, type) {
           type,
           originalName: cleanName,
           img,
-          cropOffset: 0,
+          zoom: 1,
+          panX: 0,
+          panY: 0,
           previewDataUrl: ''
         };
         state.photos.push(newPhoto);
@@ -559,59 +619,99 @@ function updateGuideBanner() {
   }
 }
 
-// 1枚の写真をCanvasに描画して返す（exportMode=trueのときはガイド枠を描画しない）
+// 元画像(img)から指定比率(targetRatio)・拡大率(zoom: 1〜3)・位置(panX, panY: -100〜100)で切り抜く矩形を計算
+function computeCropRect(img, targetRatio, zoom = 1, panX = 0, panY = 0) {
+  const imgW = img.naturalWidth;
+  const imgH = img.naturalHeight;
+  const imgRatio = imgW / imgH;
+
+  // zoom=1.0 のときに targetRatio に内接してカバーする基本矩形
+  let baseSw, baseSh;
+  if (imgRatio > targetRatio) {
+    baseSh = imgH;
+    baseSw = imgH * targetRatio;
+  } else {
+    baseSw = imgW;
+    baseSh = imgW / targetRatio;
+  }
+
+  const safeZoom = Math.max(1, Math.min(3, zoom || 1));
+  const sw = baseSw / safeZoom;
+  const sh = baseSh / safeZoom;
+
+  const maxShiftX = Math.max(0, (imgW - sw) / 2);
+  const maxShiftY = Math.max(0, (imgH - sh) / 2);
+
+  const clampedPanX = Math.max(-100, Math.min(100, panX || 0));
+  const clampedPanY = Math.max(-100, Math.min(100, panY || 0));
+
+  // panX/panY がプラス（右・下へ移動）のとき、切り抜き開始位置 sx/sy は左・上へ移動
+  const sx = (imgW - sw) / 2 - (clampedPanX / 100) * maxShiftX;
+  const sy = (imgH - sh) / 2 - (clampedPanY / 100) * maxShiftY;
+
+  return {
+    sx: Math.max(0, Math.min(imgW - sw, sx)),
+    sy: Math.max(0, Math.min(imgH - sh, sy)),
+    sw,
+    sh,
+    maxShiftX,
+    maxShiftY
+  };
+}
+
+// 1枚の写真をCanvasに描画して返す（exportMode=trueのときは高解像度出力＆ガイド枠なし）
 function renderSinglePhotoToCanvas(photo, exportMode = false) {
   const preset = PLATFORM_CONFIGS[state.platform];
   const labels = getCurrentLabels();
   const text = photo.type === 'before' ? labels.before : labels.after;
   const img = photo.img;
+  const swOrig = img.naturalWidth;
+  const shOrig = img.naturalHeight;
 
   const canvas = document.createElement('canvas');
   const ctx = canvas.getContext('2d');
 
-  let targetW, targetH;
-  let sx = 0, sy = 0, sw = img.naturalWidth, sh = img.naturalHeight;
+  let targetW, targetH, targetRatio;
+  // カード一覧のプレビュー表示時は最大960pxに抑えてスライダーやドラッグを高速化、保存・拡大確認時は最大2400pxの高解像度
+  const maxDim = exportMode ? 2400 : 960;
 
   if (state.cropMode === 'preset') {
-    // 投稿先のアスペクト比に合わせて切り抜く
-    const targetRatio = preset.aspectRatio;
-    const imgRatio = sw / sh;
-
-    if (imgRatio > targetRatio) {
-      // 元画像の方が横長 → 左右をトリミング（cropOffsetで左右シフト可能）
-      const newSw = Math.round(sh * targetRatio);
-      const maxShift = (sw - newSw) / 2;
-      const shift = (photo.cropOffset / 50) * maxShift;
-      sx = Math.round((sw - newSw) / 2 + shift);
-      sw = newSw;
-    } else if (imgRatio < targetRatio) {
-      // 元画像の方が縦長 → 上下をトリミング（cropOffsetで上下シフト可能）
-      const newSh = Math.round(sw / targetRatio);
-      const maxShift = (sh - newSh) / 2;
-      const shift = (photo.cropOffset / 50) * maxShift;
-      sy = Math.round((sh - newSh) / 2 + shift);
-      sh = newSh;
+    targetRatio = preset.aspectRatio;
+    if (exportMode) {
+      targetW = preset.targetWidth;
+      targetH = preset.targetHeight;
+    } else {
+      if (preset.targetWidth >= preset.targetHeight) {
+        targetW = Math.min(preset.targetWidth, maxDim);
+        targetH = Math.round(targetW / targetRatio);
+      } else {
+        targetH = Math.min(preset.targetHeight, maxDim);
+        targetW = Math.round(targetH * targetRatio);
+      }
     }
-
-    // 出力解像度は元画像の解像度感を保ちつつ高画質に
-    targetW = preset.targetWidth;
-    targetH = preset.targetHeight;
   } else {
-    // 元の写真の縦横比のまま（最大長辺2400pxに抑えて高画質かつ軽快に処理）
-    const maxDim = 2400;
-    if (sw > maxDim || sh > maxDim) {
-      if (sw >= sh) {
+    targetRatio = swOrig / shOrig;
+    if (swOrig > maxDim || shOrig > maxDim) {
+      if (swOrig >= shOrig) {
         targetW = maxDim;
-        targetH = Math.round((sh / sw) * maxDim);
+        targetH = Math.round((shOrig / swOrig) * maxDim);
       } else {
         targetH = maxDim;
-        targetW = Math.round((sw / sh) * maxDim);
+        targetW = Math.round((swOrig / shOrig) * maxDim);
       }
     } else {
-      targetW = sw;
-      targetH = sh;
+      targetW = swOrig;
+      targetH = shOrig;
     }
   }
+
+  const { sx, sy, sw, sh } = computeCropRect(
+    img,
+    targetRatio,
+    photo.zoom,
+    photo.panX,
+    photo.panY
+  );
 
   canvas.width = targetW;
   canvas.height = targetH;
@@ -620,7 +720,7 @@ function renderSinglePhotoToCanvas(photo, exportMode = false) {
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = 'high';
 
-  // 背景写真をを描画
+  // 背景写真を描画
   ctx.drawImage(img, sx, sy, sw, sh, 0, 0, targetW, targetH);
 
   // プレビュー用ガイド枠（保存用画像には描かない）
@@ -746,17 +846,16 @@ function renderPhotoGroup(type, containerEl) {
     const card = document.createElement('div');
     card.className = 'photo-card';
 
-    const cropControlHtml = state.cropMode === 'preset' ? `
-      <div class="crop-offset-control">
-        <span>切り抜き位置:</span>
-        <input type="range" class="js-crop-slider" min="-50" max="50" value="${photo.cropOffset}">
-      </div>
-    ` : '';
+    const zoomPct = Math.round((photo.zoom || 1) * 100);
+    const panXVal = Math.round(photo.panX || 0);
+    const panYVal = Math.round(photo.panY || 0);
+    const isAdjusted = zoomPct > 100 || panXVal !== 0 || panYVal !== 0;
 
     card.innerHTML = `
-      <div class="photo-preview-wrap" title="クリックで拡大確認">
-        <img src="${photo.previewDataUrl}" alt="${groupLabel}_${idx + 1}">
-        <span class="zoom-badge">🔍 タップで拡大</span>
+      <div class="photo-preview-wrap" title="ドラッグで位置移動 / クリックで拡大確認">
+        <img src="${photo.previewDataUrl}" alt="${groupLabel}_${idx + 1}" draggable="false">
+        <button type="button" class="zoom-badge" title="大きな画面で確認">🔍 拡大確認</button>
+        <span class="drag-hint-badge">✋ ドラッグで位置調整</span>
         <button type="button" class="delete-photo-btn" title="この写真を削除">✕</button>
       </div>
       <div class="photo-card-body">
@@ -764,7 +863,25 @@ function renderPhotoGroup(type, containerEl) {
           <span class="photo-filename">${idx + 1}. ${escapeHtml(photo.originalName)}</span>
           <span>【${groupLabel}】</span>
         </div>
-        ${cropControlHtml}
+        <div class="crop-adjust-box">
+          <div class="crop-adjust-header">
+            <span class="crop-adjust-title">📐 拡大・位置合わせ（構図調整）</span>
+            <button type="button" class="crop-reset-btn js-crop-reset" ${!isAdjusted ? 'disabled' : ''}>↺ リセット</button>
+          </div>
+          <div class="crop-slider-row">
+            <span class="crop-slider-label">🔍 拡大</span>
+            <input type="range" class="js-zoom-slider" min="100" max="300" step="1" value="${zoomPct}">
+            <span class="crop-slider-val js-zoom-val">${zoomPct}%</span>
+          </div>
+          <div class="crop-slider-row">
+            <span class="crop-slider-label">↔️ 左右</span>
+            <input type="range" class="js-panx-slider" min="-100" max="100" step="1" value="${panXVal}">
+          </div>
+          <div class="crop-slider-row">
+            <span class="crop-slider-label">↕️ 上下</span>
+            <input type="range" class="js-pany-slider" min="-100" max="100" step="1" value="${panYVal}">
+          </div>
+        </div>
         <div class="photo-card-actions">
           <button type="button" class="card-save-btn">💾 この写真を保存</button>
           <button type="button" class="card-switch-btn" title="前/後を入れ替える">⇄ ${oppositeLabel}へ移動</button>
@@ -772,12 +889,119 @@ function renderPhotoGroup(type, containerEl) {
       </div>
     `;
 
-    // 拡大プレビュー
     const previewWrap = card.querySelector('.photo-preview-wrap');
-    previewWrap.addEventListener('click', (e) => {
-      if (e.target.closest('.delete-photo-btn')) return;
+    const previewImg = previewWrap.querySelector('img');
+    const zoomBadgeBtn = card.querySelector('.zoom-badge');
+    const zoomSlider = card.querySelector('.js-zoom-slider');
+    const zoomValEl = card.querySelector('.js-zoom-val');
+    const panXSlider = card.querySelector('.js-panx-slider');
+    const panYSlider = card.querySelector('.js-pany-slider');
+    const resetBtn = card.querySelector('.js-crop-reset');
+
+    const getCurrentTargetRatio = () => {
+      if (state.cropMode === 'preset') {
+        return PLATFORM_CONFIGS[state.platform].aspectRatio;
+      }
+      return photo.img.naturalWidth / photo.img.naturalHeight;
+    };
+
+    const updateCardUIAndPreview = (syncOthers = false) => {
+      const zp = Math.round((photo.zoom || 1) * 100);
+      const px = Math.round(photo.panX || 0);
+      const py = Math.round(photo.panY || 0);
+      zoomSlider.value = zp;
+      zoomValEl.textContent = `${zp}%`;
+      panXSlider.value = px;
+      panYSlider.value = py;
+      resetBtn.disabled = !(zp > 100 || px !== 0 || py !== 0);
+
+      const updatedCanvas = renderSinglePhotoToCanvas(photo, false);
+      photo.previewDataUrl = updatedCanvas.toDataURL('image/jpeg', 0.85);
+      previewImg.src = photo.previewDataUrl;
+
+      if (syncOthers) {
+        renderCombineThumbnails();
+        renderCombinedCanvas();
+      }
+    };
+
+    // 左上バッジクリックで拡大確認モーダル
+    zoomBadgeBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
       openPreviewModal(photo.id);
     });
+
+    // プレビュー画像上のドラッグで位置移動 ＆ クリックで拡大確認
+    let isPointerDown = false;
+    let hasDragged = false;
+    let startX = 0;
+    let startY = 0;
+    let startPanX = 0;
+    let startPanY = 0;
+
+    previewWrap.addEventListener('pointerdown', (e) => {
+      if (e.target.closest('.delete-photo-btn') || e.target.closest('.zoom-badge')) return;
+      if (e.button !== undefined && e.button !== 0) return;
+      isPointerDown = true;
+      hasDragged = false;
+      startX = e.clientX;
+      startY = e.clientY;
+      startPanX = photo.panX || 0;
+      startPanY = photo.panY || 0;
+      previewWrap.setPointerCapture(e.pointerId);
+    });
+
+    previewWrap.addEventListener('pointermove', (e) => {
+      if (!isPointerDown) return;
+      const dx = e.clientX - startX;
+      const dy = e.clientY - startY;
+
+      if (!hasDragged && (Math.abs(dx) > 4 || Math.abs(dy) > 4)) {
+        hasDragged = true;
+        previewWrap.classList.add('is-dragging');
+      }
+      if (!hasDragged) return;
+
+      const targetRatio = getCurrentTargetRatio();
+      let crop = computeCropRect(photo.img, targetRatio, photo.zoom, photo.panX, photo.panY);
+
+      // 元の写真モードで拡大率100%のままドラッグした場合は自動で120%に拡大して動かせるようにする
+      if (crop.maxShiftX < 1 && crop.maxShiftY < 1) {
+        photo.zoom = 1.2;
+        crop = computeCropRect(photo.img, targetRatio, photo.zoom, photo.panX, photo.panY);
+      }
+
+      const imgRect = previewImg.getBoundingClientRect();
+      if (crop.maxShiftX > 0.5 && imgRect.width > 10) {
+        const scaleX = ((crop.sw / crop.maxShiftX) * 100) / imgRect.width;
+        photo.panX = Math.max(-100, Math.min(100, Math.round(startPanX + dx * scaleX)));
+      }
+      if (crop.maxShiftY > 0.5 && imgRect.height > 10) {
+        const scaleY = ((crop.sh / crop.maxShiftY) * 100) / imgRect.height;
+        photo.panY = Math.max(-100, Math.min(100, Math.round(startPanY + dy * scaleY)));
+      }
+
+      updateCardUIAndPreview(false);
+    });
+
+    const endPointerDrag = (e) => {
+      if (!isPointerDown) return;
+      isPointerDown = false;
+      previewWrap.classList.remove('is-dragging');
+      try {
+        previewWrap.releasePointerCapture(e.pointerId);
+      } catch (_) {}
+
+      if (hasDragged) {
+        renderCombineThumbnails();
+        renderCombinedCanvas();
+      } else if (!e.target.closest('.delete-photo-btn') && !e.target.closest('.zoom-badge')) {
+        openPreviewModal(photo.id);
+      }
+    };
+
+    previewWrap.addEventListener('pointerup', endPointerDrag);
+    previewWrap.addEventListener('pointercancel', endPointerDrag);
 
     // 削除ボタン
     card.querySelector('.delete-photo-btn').addEventListener('click', (e) => {
@@ -786,16 +1010,58 @@ function renderPhotoGroup(type, containerEl) {
       refreshAllPreviews();
     });
 
-    // 切り抜き位置スライダー
-    const cropSlider = card.querySelector('.js-crop-slider');
-    if (cropSlider) {
-      cropSlider.addEventListener('input', (e) => {
-        photo.cropOffset = parseInt(e.target.value, 10) || 0;
-        const updatedCanvas = renderSinglePhotoToCanvas(photo, false);
-        photo.previewDataUrl = updatedCanvas.toDataURL('image/jpeg', 0.88);
-        card.querySelector('.photo-preview-wrap img').src = photo.previewDataUrl;
-      });
-    }
+    // 🔍 拡大スライダー
+    zoomSlider.addEventListener('input', (e) => {
+      const zp = parseInt(e.target.value, 10) || 100;
+      photo.zoom = Math.max(1, Math.min(3, zp / 100));
+      if (zp === 100 && state.cropMode === 'original') {
+        photo.panX = 0;
+        photo.panY = 0;
+      }
+      updateCardUIAndPreview(false);
+    });
+    zoomSlider.addEventListener('change', () => {
+      renderCombineThumbnails();
+      renderCombinedCanvas();
+    });
+
+    // ↔️ 左右位置スライダー
+    panXSlider.addEventListener('input', (e) => {
+      const val = parseInt(e.target.value, 10) || 0;
+      const crop = computeCropRect(photo.img, getCurrentTargetRatio(), photo.zoom, photo.panX, photo.panY);
+      if (val !== 0 && crop.maxShiftX < 1) {
+        photo.zoom = Math.max(photo.zoom || 1, 1.2);
+      }
+      photo.panX = val;
+      updateCardUIAndPreview(false);
+    });
+    panXSlider.addEventListener('change', () => {
+      renderCombineThumbnails();
+      renderCombinedCanvas();
+    });
+
+    // ↕️ 上下位置スライダー
+    panYSlider.addEventListener('input', (e) => {
+      const val = parseInt(e.target.value, 10) || 0;
+      const crop = computeCropRect(photo.img, getCurrentTargetRatio(), photo.zoom, photo.panX, photo.panY);
+      if (val !== 0 && crop.maxShiftY < 1) {
+        photo.zoom = Math.max(photo.zoom || 1, 1.2);
+      }
+      photo.panY = val;
+      updateCardUIAndPreview(false);
+    });
+    panYSlider.addEventListener('change', () => {
+      renderCombineThumbnails();
+      renderCombinedCanvas();
+    });
+
+    // ↺ リセットボタン
+    resetBtn.addEventListener('click', () => {
+      photo.zoom = 1;
+      photo.panX = 0;
+      photo.panY = 0;
+      updateCardUIAndPreview(true);
+    });
 
     // 保存ボタン
     card.querySelector('.card-save-btn').addEventListener('click', () => {
@@ -1009,34 +1275,126 @@ function renderCombineThumbnails() {
   }
 }
 
-// 指定した枠(destW x destH)に画像を中央トリミング（offset対応）で描画するヘルパー
-function drawImageCoverWithOffset(ctx, img, dx, dy, dw, dh, offsetPercent = 0) {
-  const swOrig = img.naturalWidth;
-  const shOrig = img.naturalHeight;
+// 指定した枠(dw x dh)に写真の拡大率(zoom)と位置(panX, panY)を反映して描画するヘルパー
+function drawPhotoIntoSlot(ctx, photo, dx, dy, dw, dh) {
   const targetRatio = dw / dh;
-  const imgRatio = swOrig / shOrig;
+  const { sx, sy, sw, sh } = computeCropRect(
+    photo.img,
+    targetRatio,
+    photo.zoom,
+    photo.panX,
+    photo.panY
+  );
+  ctx.drawImage(photo.img, sx, sy, sw, sh, dx, dy, dw, dh);
+}
 
-  let sx = 0, sy = 0, sw = swOrig, sh = shOrig;
+// 合体タブのスライダー表示を選択中の写真の状態に同期
+function syncCombineFineTuneUI() {
+  const beforePhoto = state.photos.find(p => p.id === state.combine.selectedBeforeId);
+  const afterPhoto = state.photos.find(p => p.id === state.combine.selectedAfterId);
 
-  if (imgRatio > targetRatio) {
-    const newSw = Math.round(shOrig * targetRatio);
-    const maxShift = (swOrig - newSw) / 2;
-    const shift = (offsetPercent / 50) * maxShift;
-    sx = Math.round((swOrig - newSw) / 2 + shift);
-    sw = newSw;
-  } else if (imgRatio < targetRatio) {
-    const newSh = Math.round(swOrig / targetRatio);
-    const maxShift = (shOrig - newSh) / 2;
-    const shift = (offsetPercent / 50) * maxShift;
-    sy = Math.round((shOrig - newSh) / 2 + shift);
-    sh = newSh;
+  if (beforePhoto) {
+    const bZoom = Math.round((beforePhoto.zoom || 1) * 100);
+    els.combineBeforeZoom.value = bZoom;
+    els.combineBeforeZoomVal.textContent = `${bZoom}%`;
+    els.combineBeforePanX.value = Math.round(beforePhoto.panX || 0);
+    els.combineBeforePanY.value = Math.round(beforePhoto.panY || 0);
   }
+  if (afterPhoto) {
+    const aZoom = Math.round((afterPhoto.zoom || 1) * 100);
+    els.combineAfterZoom.value = aZoom;
+    els.combineAfterZoomVal.textContent = `${aZoom}%`;
+    els.combineAfterPanX.value = Math.round(afterPhoto.panX || 0);
+    els.combineAfterPanY.value = Math.round(afterPhoto.panY || 0);
+  }
+}
 
-  ctx.drawImage(img, sx, sy, sw, sh, dx, dy, dw, dh);
+// 合体プレビューCanvas上でのドラッグで左右（または上下）の写真を直接位置調整できる機能
+function setupCombineCanvasDrag() {
+  const canvas = els.combineCanvas;
+  let activePhoto = null;
+  let startX = 0;
+  let startY = 0;
+  let startPanX = 0;
+  let startPanY = 0;
+  let slotRatio = 1;
+  let slotScreenW = 1;
+  let slotScreenH = 1;
+
+  canvas.addEventListener('pointerdown', (e) => {
+    const beforePhoto = state.photos.find(p => p.id === state.combine.selectedBeforeId);
+    const afterPhoto = state.photos.find(p => p.id === state.combine.selectedAfterId);
+    if (!beforePhoto || !afterPhoto) return;
+
+    const rect = canvas.getBoundingClientRect();
+    const relX = e.clientX - rect.left;
+    const relY = e.clientY - rect.top;
+    const isHoriz = state.combine.direction === 'horizontal';
+
+    if (isHoriz) {
+      activePhoto = relX < rect.width / 2 ? beforePhoto : afterPhoto;
+      slotScreenW = rect.width / 2;
+      slotScreenH = rect.height;
+      slotRatio = (canvas.width / 2) / canvas.height;
+    } else {
+      activePhoto = relY < rect.height / 2 ? beforePhoto : afterPhoto;
+      slotScreenW = rect.width;
+      slotScreenH = rect.height / 2;
+      slotRatio = canvas.width / (canvas.height / 2);
+    }
+
+    startX = e.clientX;
+    startY = e.clientY;
+    startPanX = activePhoto.panX || 0;
+    startPanY = activePhoto.panY || 0;
+    canvas.setPointerCapture(e.pointerId);
+  });
+
+  canvas.addEventListener('pointermove', (e) => {
+    if (!activePhoto) return;
+    const dx = e.clientX - startX;
+    const dy = e.clientY - startY;
+    if (Math.abs(dx) < 3 && Math.abs(dy) < 3) return;
+
+    let crop = computeCropRect(activePhoto.img, slotRatio, activePhoto.zoom, activePhoto.panX, activePhoto.panY);
+    if (crop.maxShiftX < 1 && crop.maxShiftY < 1) {
+      activePhoto.zoom = 1.2;
+      crop = computeCropRect(activePhoto.img, slotRatio, activePhoto.zoom, activePhoto.panX, activePhoto.panY);
+    }
+
+    if (crop.maxShiftX > 0.5 && slotScreenW > 10) {
+      const scaleX = ((crop.sw / crop.maxShiftX) * 100) / slotScreenW;
+      activePhoto.panX = Math.max(-100, Math.min(100, Math.round(startPanX + dx * scaleX)));
+    }
+    if (crop.maxShiftY > 0.5 && slotScreenH > 10) {
+      const scaleY = ((crop.sh / crop.maxShiftY) * 100) / slotScreenH;
+      activePhoto.panY = Math.max(-100, Math.min(100, Math.round(startPanY + dy * scaleY)));
+    }
+
+    syncCombineFineTuneUI();
+    renderCombinedCanvas(false);
+  });
+
+  const endDrag = (e) => {
+    if (!activePhoto) return;
+    const editedPhoto = activePhoto;
+    activePhoto = null;
+    try {
+      canvas.releasePointerCapture(e.pointerId);
+    } catch (_) {}
+
+    const updatedCanvas = renderSinglePhotoToCanvas(editedPhoto, false);
+    editedPhoto.previewDataUrl = updatedCanvas.toDataURL('image/jpeg', 0.85);
+    renderPhotoGroup(editedPhoto.type, editedPhoto.type === 'before' ? els.beforePhotoGrid : els.afterPhotoGrid);
+    renderCombineThumbnails();
+  };
+
+  canvas.addEventListener('pointerup', endDrag);
+  canvas.addEventListener('pointercancel', endDrag);
 }
 
 // 2枚合体Canvasの描画
-function renderCombinedCanvas() {
+function renderCombinedCanvas(syncUI = true) {
   const beforePhoto = state.photos.find(p => p.id === state.combine.selectedBeforeId);
   const afterPhoto = state.photos.find(p => p.id === state.combine.selectedAfterId);
 
@@ -1054,6 +1412,10 @@ function renderCombinedCanvas() {
   els.combineFineTune.classList.remove('hidden');
   els.downloadCombinedBtn.disabled = false;
   els.shareCombinedBtn.disabled = false;
+
+  if (syncUI) {
+    syncCombineFineTuneUI();
+  }
 
   const preset = PLATFORM_CONFIGS[state.platform];
   const labels = getCurrentLabels();
@@ -1092,8 +1454,8 @@ function renderCombinedCanvas() {
     const halfW = Math.floor(totalW / 2);
     const rightW = totalW - halfW;
 
-    drawImageCoverWithOffset(ctx, beforePhoto.img, 0, 0, halfW, totalH, state.combine.beforeOffset);
-    drawImageCoverWithOffset(ctx, afterPhoto.img, halfW, 0, rightW, totalH, state.combine.afterOffset);
+    drawPhotoIntoSlot(ctx, beforePhoto, 0, 0, halfW, totalH);
+    drawPhotoIntoSlot(ctx, afterPhoto, halfW, 0, rightW, totalH);
 
     // 境界線
     if (state.combine.border !== 'none') {
@@ -1132,8 +1494,8 @@ function renderCombinedCanvas() {
     const halfH = Math.floor(totalH / 2);
     const bottomH = totalH - halfH;
 
-    drawImageCoverWithOffset(ctx, beforePhoto.img, 0, 0, totalW, halfH, state.combine.beforeOffset);
-    drawImageCoverWithOffset(ctx, afterPhoto.img, 0, halfH, totalW, bottomH, state.combine.afterOffset);
+    drawPhotoIntoSlot(ctx, beforePhoto, 0, 0, totalW, halfH);
+    drawPhotoIntoSlot(ctx, afterPhoto, 0, halfH, totalW, bottomH);
 
     // 境界線
     if (state.combine.border !== 'none') {

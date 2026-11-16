@@ -306,15 +306,44 @@
             </div>
 
             <div class="combine-FineTune" id="combineFineTune">
-              <div class="fine-tune-item">
-                <label>【<span class="js-before-label">施工前</span>】の写真位置調整：</label>
-                <input type="range" id="combineBeforeOffset" min="-50" max="50" value="0">
-                <button type="button" class="mini-reset-btn" id="resetBeforeOffset">中央に戻す</button>
+              <div class="fine-tune-card before-fine-tune">
+                <div class="fine-tune-header">
+                  <strong>① 【<span class="js-before-label">施工前</span>】の拡大・位置合わせ</strong>
+                  <button type="button" class="mini-reset-btn" id="resetBeforeOffset">↺ リセット</button>
+                </div>
+                <div class="fine-tune-row">
+                  <span class="fine-tune-label">🔍 拡大:</span>
+                  <input type="range" id="combineBeforeZoom" min="100" max="300" step="1" value="100">
+                  <span class="fine-tune-val" id="combineBeforeZoomVal">100%</span>
+                </div>
+                <div class="fine-tune-row">
+                  <span class="fine-tune-label">↔️ 左右:</span>
+                  <input type="range" id="combineBeforePanX" min="-100" max="100" step="1" value="0">
+                </div>
+                <div class="fine-tune-row">
+                  <span class="fine-tune-label">↕️ 上下:</span>
+                  <input type="range" id="combineBeforePanY" min="-100" max="100" step="1" value="0">
+                </div>
               </div>
-              <div class="fine-tune-item">
-                <label>【<span class="js-after-label">施工後</span>】の写真位置調整：</label>
-                <input type="range" id="combineAfterOffset" min="-50" max="50" value="0">
-                <button type="button" class="mini-reset-btn" id="resetAfterOffset">中央に戻す</button>
+
+              <div class="fine-tune-card after-fine-tune">
+                <div class="fine-tune-header">
+                  <strong>② 【<span class="js-after-label">施工後</span>】の拡大・位置合わせ</strong>
+                  <button type="button" class="mini-reset-btn" id="resetAfterOffset">↺ リセット</button>
+                </div>
+                <div class="fine-tune-row">
+                  <span class="fine-tune-label">🔍 拡大:</span>
+                  <input type="range" id="combineAfterZoom" min="100" max="300" step="1" value="100">
+                  <span class="fine-tune-val" id="combineAfterZoomVal">100%</span>
+                </div>
+                <div class="fine-tune-row">
+                  <span class="fine-tune-label">↔️ 左右:</span>
+                  <input type="range" id="combineAfterPanX" min="-100" max="100" step="1" value="0">
+                </div>
+                <div class="fine-tune-row">
+                  <span class="fine-tune-label">↕️ 上下:</span>
+                  <input type="range" id="combineAfterPanY" min="-100" max="100" step="1" value="0">
+                </div>
               </div>
             </div>
 
